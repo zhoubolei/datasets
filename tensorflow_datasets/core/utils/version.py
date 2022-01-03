@@ -176,10 +176,10 @@ def _str_to_version(version_str, allow_wildcard=False):
 
 def list_all_versions(root_dir: str) -> List[Version]:
   """Lists all dataset versions present on disk, sorted."""
-  if not tf.io.gfile.exists(root_dir):
+  try:
+    # Strip trailing slash (required for `gs://` root_dir)
+    paths = [p.rstrip("/") for p in tf.io.gfile.listdir(root_dir)]
+    # Return all versions
+    return sorted(Version(v) for v in paths if Version.is_valid(v))
+  except (FileNotFoundError, tf.errors.NotFoundError):
     return []
-
-  # Strip trailing slash (required for `gs://` root_dir)
-  paths = [p.rstrip("/") for p in tf.io.gfile.listdir(root_dir)]
-  # Return all versions
-  return sorted(Version(v) for v in paths if Version.is_valid(v))

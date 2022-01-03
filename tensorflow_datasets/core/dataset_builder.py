@@ -194,9 +194,10 @@ class DatasetBuilder(registered.RegisteredDataset):
     self._version = self._pick_version(version)
     # Compute the base directory (for download) and dataset/version directory.
     self._data_dir_root, self._data_dir = self._build_data_dir(data_dir)
-    if tf.io.gfile.exists(self._data_dir):
+    try:
       self.info.read_from_directory(self._data_dir)
-    else:  # Use the code version (do not restore data)
+    except FileNotFoundError:
+      # Use the code version (do not restore data)
       self.info.initialize_from_bucket()
 
   @utils.classproperty

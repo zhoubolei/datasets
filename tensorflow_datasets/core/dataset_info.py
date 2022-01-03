@@ -490,16 +490,16 @@ class DatasetInfo(object):
     """
     logging.info("Load dataset info from %s", dataset_info_dir)
 
+    # Load the metadata from disk
     json_filename = dataset_info_path(dataset_info_dir)
-    if not tf.io.gfile.exists(json_filename):
+    try:
+      parsed_proto = read_from_json(json_filename)
+    except (FileNotFoundError, tf.errors.NotFoundError) as e:
       raise FileNotFoundError(
           "Tried to load `DatasetInfo` from a directory which does not exist or"
           " does not contain `dataset_info.json`. Please delete the directory "
           f"`{dataset_info_dir}`  if you are trying to re-generate the "
-          "dataset.")
-
-    # Load the metadata from disk
-    parsed_proto = read_from_json(json_filename)
+          "dataset.") from e
 
     # Update splits
     filename_template = naming.ShardedFileTemplate(
@@ -514,18 +514,21 @@ class DatasetInfo(object):
     # Restore the feature metadata (vocabulary, labels names,...)
     if self.features:
       self.features.load_metadata(dataset_info_dir)
-    # For `ReadOnlyBuilder`, reconstruct the features from the config.
-    elif tf.io.gfile.exists(feature_lib.make_config_path(dataset_info_dir)):
-      self._features = feature_lib.FeatureConnector.from_config(
-          dataset_info_dir)
+    else:
+      # For `ReadOnlyBuilder`, reconstruct the features from the config.
+      try:
+        self._features = feature_lib.FeatureConnector.from_config(
+            dataset_info_dir)
+      except (FileNotFoundError, tf.errors.NotFoundError):
+        pass
+
     # Restore the MetaDataDict from metadata.json if there is any
-    if (self.metadata is not None or
-        tf.io.gfile.exists(_metadata_filepath(dataset_info_dir))):
-      # If the dataset was loaded from file, self.metadata will be `None`, so
-      # we create a MetadataDict first.
-      if self.metadata is None:
-        self._metadata = MetadataDict()
-      self.metadata.load_metadata(dataset_info_dir)
+    try:
+      metadata = self.metadata or MetadataDict()
+      metadata.load_metadata(dataset_info_dir)
+      self._metadata = metadata
+    except (FileNotFoundError, tf.errors.NotFoundError):
+      pass
 
     # Update fields which are not defined in the code. This means that
     # the code will overwrite fields which are present in
@@ -765,7 +768,10 @@ def get_dataset_feature_statistics(builder, split):
 
 def read_from_json(path: epath.PathLike) -> dataset_info_pb2.DatasetInfo:
   """Read JSON-formatted proto into DatasetInfo proto."""
-  json_str = epath.Path(path).read_text()
+  try:
+    json_str = epath.Path(path).read_text()
+  except Exception as e:
+    raise e
   # Parse it back into a proto.
   parsed_proto = json_format.Parse(json_str, dataset_info_pb2.DatasetInfo())
   return parsed_proto
@@ -786,10 +792,11 @@ def read_proto_from_builder_dir(
   """
   info_path = os.path.join(
       os.path.expanduser(builder_dir), DATASET_INFO_FILENAME)
-  if not tf.io.gfile.exists(info_path):
+  try:
+    return read_from_json(info_path)
+  except tf.errors.NotFoundError as e:
     raise FileNotFoundError(
-        f"Could not load dataset info: {info_path} does not exist.")
-  return read_from_json(info_path)
+        f"Could not load dataset info: {info_path} does not exist.") from e
 
 
 def pack_as_supervised_ds(

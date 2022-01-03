@@ -176,8 +176,10 @@ class ClassLabel(tensor_feature.Tensor):
     """See base class for details."""
     # Restore names if defined
     names_filepath = _get_names_filepath(data_dir, feature_name)
-    if tf.io.gfile.exists(names_filepath):
+    try:
       self.names = _load_names_from_file(names_filepath)
+    except (FileNotFoundError, tf.errors.NotFoundError):
+      pass
 
   def _additional_repr_info(self):
     return {"num_classes": self.num_classes}
