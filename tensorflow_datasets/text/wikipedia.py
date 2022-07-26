@@ -29,10 +29,6 @@ import tensorflow_datasets.public_api as tfds
 from absl import flags  # pylint:disable=g-bad-import-order,g-import-not-at-top
 
 FLAGS = flags.FLAGS
-flags.DEFINE_boolean(
-    "wikipedia_auto_select_flume_mode", True,
-    "If True, will automatically determine whether to run flume on borg or "
-    "locally based on the dump size for each language.")
 
 _CITATION = """\
 @ONLINE {wikidump,
